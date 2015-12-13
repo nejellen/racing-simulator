@@ -1,78 +1,29 @@
 <?php
-class horse {
-	function __construct($id, $name, $speed, $endurance, $surf_pref, $dist_pref, $trait) {
-		$this->id = $id;
-		$this->name = $name;
-		$this->speed = $speed;
-		$this->endurance = $endurance;
-		$this->surf_pref = $surf_pref;
-		$this->dist_pref = $dist_pref;
-		$this->trait = $trait;
-	}
 
-	function print_details() {
-		print "Name: {$this->name}.\n";
-		print "Speed: {$this->speed}.\n";
-		print "Surface Preference: ".self::$surf_pref_name[$this->surf_pref]."\n";
-		print "Distance Preference: ".self::$dist_pref_name[$this->dist_pref]."\n";
-	}
+ini_set('memory_limit','512M');
 
-	function surf_pref_name() {
-		return self::$surf_pref_name[$this->surf_pref];
-	}
+require_once('horse.php');
+require_once('track.php');
+require_once('DecisionTree.php');
+require_once('GameState.php');
 
-	function dist_pref_name() {
-		return self::$dist_pref_name[$this->dist_pref];
-	}
-
-	function get_trait() {
-		return $this->trait;
-	}
-
-	function get_id() {
-		return $this->id;
-	}
-
-	function get_speed() {
-		return $this->speed;
-	}
-
-	function get_endurance() {
-		return $this->endurance;
-	}
-
-	private $id;
-	private $name;
-	private $speed;
-	private $endurance;
-	private $surf_pref;
-	private $dist_pref;
-	private $trait;
-
-	private static $surf_pref_name = array (
-		1 => "Turf",
-		2 => "Dirt"
-	);
-	private static $dist_pref_name = array (
-		1 => "Sprint (5-8F)",
-		2 => "Middle (7-10F)",
-		3 => "Classic (9-12F)"
-	);
-	private static $traits = array (
-		1 => "Front Runner",
-		2 => "Pace Presser",
-		3 => "Closer"
-	);
-}
-
-function compare_positions($a, $b) {
-	return $a->get_position() < $b->get_position();
+function build_compare_positions($track) {
+	return function ($a, $b) use ($track) {
+		if ($a->get_lap_counter() == $b->get_lap_counter()) {
+			return $track->lane_percent_completed($a->get_lane(), $a->get_position_x(), $a->get_position_y())
+			<
+			$track->lane_percent_completed($b->get_lane(), $b->get_position_x(), $b->get_position_y());
+		} else {
+			return $a->get_lap_counter() < $b->get_lap_counter();
+		}
+	};
 }
 
 class snapshot {
-	function __construct($ts) {
+	function __construct($ts, $track) {
 		$this->ts = $ts;
 		$this->details = array();
+		$this->track = $track;
 	}
 
 	function add_horse($new_details) {
@@ -80,7 +31,7 @@ class snapshot {
 	}
 
 	function sort_details() {
-		usort($this->details, "compare_positions");
+		usort($this->details, build_compare_positions($this->track));
 	}
 
 	function print_snapshot() {
@@ -101,7 +52,7 @@ class snapshot {
 				$placement,
 				$suffix,
 				$horseid,
-				$this->details[$i]->get_position(),
+				$this->details[$i]->get_position_x(),
 				$this->details[$i]->get_endurance(),
 				$this->details[$i]->get_speed()
 				
@@ -118,8 +69,12 @@ class snapshot {
 		for ($i = 0; $i < count($this->details); $i++) {
 			$foo = new stdClass();
 			$foo->id = $this->details[$i]->get_id();
-			$foo->pos = $this->details[$i]->get_position();
+			$foo->pos_x = $this->details[$i]->get_position_x();
+			$foo->pos_y = $this->details[$i]->get_position_y();
+			$foo->dir = $this->details[$i]->get_direction();
 			$foo->pp = $this->details[$i]->get_post_position();
+			$foo->tx = $this->details[$i]->get_tar_x();
+			$foo->ty = $this->details[$i]->get_tar_y();
 			$array[] = $foo;
 		}
 
@@ -141,6 +96,17 @@ class snapshot {
 	function get_ordered_details() {
 		$this->sort_details();
 		return $this->details;
+	}
+
+	function get_horse_ahead($lane, $x, $y) {
+		$obstacle_horses = [];
+		foreach ($this->details as $horse) {
+			if ($horse->get_lane() == $lane) {
+				$obstacle_horse[] = $horse;
+			}
+		}
+		// sort in order from lowest to highest
+		usort($obstacle_horses, build_compare_positions($this->track));
 	}
 
 	function get_placement($horseid) {
@@ -174,24 +140,35 @@ class snapshot {
 
 	private $ts;
 	private $details;
+	private $track;
 }
 
 class horse_details {
-	function __construct($id, $position, $endurance, $speed, $boost, $post_position) {
+	function __construct($id, $position_x, $position_y, $endurance, $speed, $direction, $boost, $post_position, $section, $lane, $lap_counter, $target) {
 		$this->id = $id;
-		$this->position = $position;
+		$this->position_x = $position_x;
+		$this->position_y = $position_y;
 		$this->endurance = $endurance;
 		$this->speed = $speed;
+		$this->direction = $direction;
 		$this->boost = $boost;
 		$this->post_position = $post_position;
+		$this->section = $section;
+		$this->lane = $lane;
+		$this->lap_counter = $lap_counter;
+		$this->target = $target;
 	}
 
 	function get_id() {
 		return $this->id;
 	}
 
-	function get_position() {
-		return $this->position;
+	function get_position_x() {
+		return $this->position_x;
+	}
+
+	function get_position_y() {
+		return $this->position_y;
 	}
 
 	function get_endurance() {
@@ -202,6 +179,10 @@ class horse_details {
 		return $this->speed;
 	}
 
+	function get_direction() {
+		return $this->direction;
+	}
+
 	function get_boost() {
 		return $this->boost;
 	}
@@ -210,68 +191,132 @@ class horse_details {
 		return $this->post_position;
 	}
 
+	function get_section() {
+		return $this->section;
+	}
+
+	function get_lane() {
+		return $this->lane;
+	}
+
+	function get_lap_counter() {
+		return $this->lap_counter;
+	}
+    
+    function get_tar_x() {
+		return $this->target[0];
+	}
+    
+    function get_tar_y() {
+		return $this->target[1];
+	}
+
 	private $id;
-	private $position;
+	private $position_x;
+	private $position_y;
 	private $endurance;
 	private $speed;
+	private $direction;
 	private $boost;
 	private $post_position;
+	private $section;
+	private $lane;
+	private $lap_counter;
+    private $target;
 }
 
 //populate an array of horses
 $horses = array(
-	new horse(1,"Alex", 60, 50, 1, 1, 1),
-	new horse(2, "Bob", 60, 50, 1, 1, 1),
-	new horse(3,"Maggie", 60, 50, 1, 1, 1),
-	new horse(4, "Sigboom", 60, 50, 1, 1, 2),
-	new horse(5,"Peter", 60, 50, 1, 1, 2),
-	new horse(6, "Janelle", 60, 50, 1, 1, 2),
-	new horse(7,"Ingrid", 60, 50, 1, 1, 1),
-	new horse(8, "Nea", 60, 50, 1, 1, 1),
-	new horse(9,"Sarah", 60, 50, 1, 1, 1),
-	new horse(10, "Christina", 60, 50, 1, 1, 2),
-	new horse(11,"Julianna", 60, 50, 1, 1, 2),
-	new horse(12, "Morgan", 60, 50, 1, 1, 2),
-	new horse(13,"Amanda", 60, 50, 1, 1, 2),
-	new horse(14, "Heather", 60, 50, 1, 1, 2)
+	new horse(1,"Alex", 60, 50, 1, 1, 1, 1),
+	new horse(2, "Bob", 60, 50, 1, 1, 1, 2),
+	new horse(3,"Maggie", 60, 50, 1, 1, 1, 3),
+	new horse(4, "Sigboom", 60, 50, 1, 1, 2, 4),
+	new horse(5,"Peter", 60, 50, 1, 1, 2, 5),
+	new horse(6, "Janelle", 60, 50, 1, 1, 2, 6),
+	new horse(7,"Ingrid", 60, 50, 1, 1, 1, 7),
+	new horse(8, "Nea", 60, 50, 1, 1, 1, 1),
+	new horse(9,"Sarah", 60, 50, 1, 1, 1, 2),
+	new horse(10, "Christina", 60, 50, 1, 1, 2, 3),
+	new horse(11,"Julianna", 60, 50, 1, 1, 2, 4),
+	new horse(12, "Morgan", 60, 50, 1, 1, 2, 5),
+	new horse(13,"Amanda", 60, 50, 1, 1, 2, 6),
+	new horse(14, "Heather", 60, 50, 1, 1, 2, 7)
+ 
 );
 
-$post_positions = array();
-for ($i = 1; $i <= count($horses); $i++) {
-	$post_positions[] = $i;
-}
-shuffle($post_positions);
+function initializeLaneScoreTree() {
 
-$i = 0;
-$initial_snapshot = new snapshot(0);
-foreach($horses as $horse) {
-	$initial_snapshot->add_horse(new horse_details($horse->get_id(), 0, $horse->get_endurance(), $horse->get_speed(), 0, $post_positions[$i]));
-	$i++;
+	$num_lengths_ahead_node = new DecisionTreeNode("num_lengths_ahead", [
+		new Edge("0", 0, null),
+		new Edge ("1", 1, null),
+		new Edge ("2", 2, null),
+		new Edge ("3", 3, null),
+		new Edge ("4", 4, null),
+		new Edge ("5+", 5, null)
+	]);
+
+	$right_lane_num_turns_left_node = new DecisionTreeNode("num_turns_left", [
+		new Edge("0", -0, $num_lengths_ahead_node),
+		new Edge ("1", -1, $num_lengths_ahead_node),
+		new Edge("2", -2, $num_lengths_ahead_node)
+	]);
+
+	$left_lane_num_turns_left_node = new DecisionTreeNode("num_turns_left", [
+		new Edge("0", 0, $num_lengths_ahead_node),
+		new Edge ("1", 1, $num_lengths_ahead_node),
+		new Edge("2", 2, $num_lengths_ahead_node)
+	]);
+
+	$where_is_lane_node = new DecisionTreeNode("where_is_lane", [
+		new Edge("left", 0, $left_lane_num_turns_left_node),
+		new Edge("right", 0, $right_lane_num_turns_left_node),
+		new Edge ("same", 0, $num_lengths_ahead_node)
+	]);
+
+	$space_in_lane_node = new DecisionTreeNode("space_in_this_lane", [
+		new Edge("yes", 0, $where_is_lane_node),
+		new Edge ("no", null, null)
+	]);
+
+	return new DecisionTree($space_in_lane_node);
 }
 
+// Set up the initial snapshot
+
+
+$track = new Track(3000, 2000, 80, 840, 2160, 840, 840, 420.169, 20);
+$lane_score_tree = initializeLaneScoreTree();
+$game_state = new GameState($horses, $track);
 $animation_array = array();
-
-$previous_snapshot = $initial_snapshot;
 
 $done = false;
 $ts = 1;
-$total_distance = 7920;
+$ts_scale = 0.01;
+$total_distance = 840 + 1320;
 
 while(!$done) {
-	$snapshot = new snapshot($ts);
+	$snapshot = new snapshot($ts, $track);
 	
-	$dt = $snapshot->get_ts() - $previous_snapshot->get_ts();	
-	$finished = 0;
+	$dt = ($snapshot->get_ts() - $game_state->get_ts()) * $ts_scale;
+	$num_horses_finished = 0;
 	foreach($horses as $horse) {
 		// gather some useful info into one place
 		$horseid = $horse->get_id();
-		$horse_detail = $previous_snapshot->get_details($horseid);
-		$old_pos = $horse_detail->get_position();
+		/** @var horse_details $horse_detail */
+		$horse_detail = $game_state->get_details($horseid);
+		$old_pos_x = $horse_detail->get_position_x();
+		$old_pos_y = $horse_detail->get_position_y();
 		$boost = $horse_detail->get_boost();
-		$race_over = ($old_pos > $total_distance);
+
+		if ($horse_detail->get_lap_counter() > 0 && $horse_detail->get_section() > 0) {
+			$this_horse_finished = true;
+		} else {
+			$this_horse_finished = false;
+		}
+
 		$post_position = $horse_detail->get_post_position();
 
-		
+
 		$old_end = $horse_detail->get_endurance();
 		$sleepy = ($old_end < 0);
 		$first_call_boost = ($boost > 0);
@@ -279,70 +324,203 @@ while(!$done) {
 		//calculate new position
 
 		// calculates speed
-		$race_over_multiplier = ($race_over ? 0.5 : 1);
+		$race_over_multiplier = ($this_horse_finished ? 0.5 : 1);
 		$sleepy_multiplier = ($sleepy ? 0.5 : 1);
 		$first_call_multiplier = ($first_call_boost ? 1.0 : 0.9);
 
-		$new_speed = $horse->get_speed() * $race_over_multiplier 
-									     * $sleepy_multiplier
-										 * $first_call_multiplier;
+		// calculate speed for this time step
+		$new_speed = $horse->get_speed() * $race_over_multiplier
+			* $sleepy_multiplier
+			* $first_call_multiplier;
 
-		
+		// calculate direction for this time step
+		// look up which section the horse is in
+		$old_section = $horse_detail->get_section();
+		// look up which lane the horse is in
+		$old_lane = $horse_detail->get_lane();
+		// run function using lane, coordinates, and section, which will return a number for how far off the lane the horse is
 
+		// find the closest point on the current lane
+		$lane_pt = $track->get_closest_point_to_lane($old_lane, $old_pos_x, $old_pos_y);
+
+		// calculate target point (where the horse wants to go, 20 feet along the current lane)
+		$target_dist = $track->distance_along_lane($old_lane, $lane_pt[0], $lane_pt[1]) + 20;
+		$target_pt = $track->get_coordinate_from_distance($old_lane, $target_dist);
+
+		// calculate heading point (where the horse will go if it doesn't turn, 20 feed straight ahead)
+		$old_direction = $horse_detail->get_direction();
+		$heading_x = $old_pos_x + cos($old_direction) * 20;
+		$heading_y = $old_pos_y - sin($old_direction) * 20;
+
+		// find the angle between the heading and the target
+		$angle = $track->find_angle($heading_x, $heading_y, $old_pos_x, $old_pos_y, $target_pt[0], $target_pt[1]);
+
+		// Calculate new heading (old direction adjusted by the angle between heading and target
+		$new_direction = $old_direction - ($angle / 20);
+
+		// optional debug information
+		/*if ($horseid == 1) {
+			print "TS: $ts pos=($old_pos_x, $old_pos_y) tar=(${target_pt[0]}, ${target_pt[1]}) head=($heading_x, $heading_y) lane=(${lane_pt[0]},${lane_pt[1]}) [$old_lane] dir=$new_direction $ angle = $angle\n";
+		}*/
 		// TODO: adjust current speed
+		// check collision with horse ahead
+		$distance_to_my_nose = $track->distance_along_lane($old_lane, $lane_pt[0], $lane_pt[1]);
+		// adjust for number of laps around
+		$distance_to_my_nose += $track->lane_length($old_lane) * $horse_detail->get_lap_counter();
+
+		foreach ($horses as $h) {
+			/** @var horse_details $hd */
+			$hd = $game_state->get_details($h->get_id());
+
+			if ($h->get_id() == $horseid) {
+				continue;
+			}
+
+			if ($hd->get_lane() != $old_lane) {
+				continue;
+			}
+
+			$distance_to_their_nose = $track->distance_along_lane($hd->get_lane(), $hd->get_position_x(), $hd->get_position_y());
+			// adjust for number of laps around
+			$distance_to_their_nose += $track->lane_length($hd->get_lane()) * $hd->get_lap_counter();
+
+			if ($distance_to_their_nose < $distance_to_my_nose) {
+				continue;
+			}
+
+			if (abs($distance_to_my_nose - $distance_to_their_nose) < 9) {
+				$new_speed = 0;//$hd->get_speed();
+			}
+		}
 
 		//calculate distance traveled in current ts
-		$this_ts_distance = ($new_speed + rand(-20,20)) * $dt;
-		$new_pos = $old_pos + $this_ts_distance;
+		$this_ts_distance = ($new_speed + rand(-20, 20)) * $dt;
+		$dx = $this_ts_distance * cos($new_direction);
+		$new_pos_x = $old_pos_x + $dx;
 
+		$dy = $this_ts_distance * sin($new_direction);
+		$new_pos_y = $old_pos_y - $dy;
+
+		// if new pos overlaps projected new pos of next horse then reduce speed and recalculate.
+
+
+		// calculate whether the horse moved into a new section
+		$new_section = $track->get_section($new_pos_x, $new_pos_y);
+
+		$horse_state = new stdClass();
+		$horse_state->lane = $old_lane;
+		$horse_state->horseid = $horseid;
+
+		// 10 -> 1 % 14 -> 1
+		// 20 -> 2 % 14 -> 2
+		// 150 -> 15 % 14 -> 1
+
+		// calculate decision tree score for each lane
+		if ($ts % 10 == 0 && ($ts/10) % count($horses) == ($horseid - 1)) {
+			$current_lane_score = $lane_score_tree->calcScore($game_state, $horse_state);
+
+			$horse_state->lane = $old_lane + 1;
+			if ($horse_state->lane > $track->get_lane_count()) {
+				$right_lane_score = null;
+			} else {
+				$right_lane_score = $lane_score_tree->calcScore($game_state, $horse_state);
+			}
+
+			$horse_state->lane = $old_lane - 1;
+			if ($horse_state->lane < 1) {
+				$left_lane_score = null;
+			} else {
+				$left_lane_score = $lane_score_tree->calcScore($game_state, $horse_state);
+			}
+
+			if ($right_lane_score !== null && $left_lane_score !== null) {
+				// switch lanes or stay in current lane based on score
+				if ($current_lane_score > $right_lane_score && $current_lane_score > $left_lane_score) {
+					$new_lane = $old_lane;
+				} else if ($right_lane_score > $current_lane_score && $right_lane_score > $left_lane_score) {
+					$new_lane = $old_lane + 1;
+				} else {
+					$new_lane = $old_lane - 1;
+				}
+			} else if ($right_lane_score === null && $left_lane_score === null) {
+				$new_lane = $old_lane;
+			} else if ($right_lane_score === null) {
+				if ($current_lane_score > $left_lane_score) {
+					$new_lane = $old_lane;
+				} else {
+					$new_lane = $old_lane - 1;
+				}
+			} else if ($left_lane_score === null) {
+				if ($current_lane_score > $right_lane_score) {
+					$new_lane = $old_lane;
+				} else if ($right_lane_score > $current_lane_score) {
+					$new_lane = $old_lane + 1;
+				}
+			}
+		} else {
+			$new_lane = $old_lane;
+		}
+
+		//if ($horseid == 2) {
+		//print "TS: $ts horse: $horseid [$old_lane -> $new_lane] left_score=".($left_lane_score === null ? "null" : $left_lane_score)." current_score=".($current_lane_score === null ? "null" : $current_lane_score)." right_score=".($right_lane_score === null ? "null" : $right_lane_score)."\n";
+		//}
+
+		// change the lap after the horse has been around the track once.
+		if ($old_section == 5 && $new_section == 0) {
+			$new_lap = $horse_detail->get_lap_counter() + 1;
+		} else {
+			$new_lap = $horse_detail->get_lap_counter();
+		}
+
+		// this is going to change!
 		$first_call_pos = 1320;
 
 		$new_boost = $boost;
-		if ($old_pos < $first_call_pos && $new_pos >= $first_call_pos) {
-			print "BOOST POINT: {$horse->get_trait()} ---- {$previous_snapshot->get_placement($horseid)} ";
-			if ($horse->get_trait() == 1 && $previous_snapshot->get_placement($horseid) == 1) {
-				print "TRAIT 1 BOOST ACTIVATED: {$horse->get_trait()} ---- {$previous_snapshot->get_placement($horseid)} ";
+		if ($old_pos_x < $first_call_pos && $new_pos_x >= $first_call_pos) {
+			print "BOOST POINT: {$horse->get_trait()} ---- {$game_state->get_placement($horseid)} ";
+			if ($horse->get_trait() == 1 && $game_state->get_placement($horseid) == 1) {
+				print "TRAIT 1 BOOST ACTIVATED: {$horse->get_trait()} ---- {$game_state->get_placement($horseid)} ";
 				$new_boost = 1;
-			} else if ($horse->get_trait() == 2 && $previous_snapshot->get_placement($horseid) == 2) {
+			} else if ($horse->get_trait() == 2 && $game_state->get_placement($horseid) == 2) {
 				$new_boost = 1;
 				print "TRAIT 2 BOOST ACTIVATED ";
 			}
 
 		}
 
-		//calculate new endurance
+		// calculate new endurance
 		
 		$new_end = $old_end - 0.005 * $this_ts_distance;
 
-		//create new snapshot
-		$snapshot->add_horse(new horse_details($horseid, $new_pos, $new_end, $new_speed, $new_boost, $horse_detail->get_post_position()));
+		// create new snapshot
+		$snapshot->add_horse(new horse_details($horseid, $new_pos_x, $new_pos_y, $new_end, $new_speed, $new_direction, $new_boost, $horse_detail->get_post_position(), $new_section, $new_lane, $new_lap, $target_pt));
 
-		//check if horse has crossed the finish line in this ts, if so increase finished counter
-		if ($new_pos > $total_distance) {
-			$finished++;
+		// check if horse has crossed the finish line in this ts, if so increase finished counter
+		if ($this_horse_finished) {
+			$num_horses_finished++;
 		}
 	}
 
-	if ($finished == count($horses)) {
+	if ($num_horses_finished == count($horses)) {
 		$done = true;
 	}
 
-	print $snapshot->print_snapshot();
-	$animation_array[] = $snapshot->get_animation_array();
-	$previous_snapshot = $snapshot;
+	//print $snapshot->print_snapshot();
+	if ($ts % 1 == 0) {
+		$animation_array[] = $snapshot->get_animation_array();
+        print "$ts ";
+	}
+	$game_state->set_snapshot($snapshot);
 
 	$ts++;
 
-	if ($ts > 300) {
+	if ($ts > 16000) {
 		$done = true;
 	}
 }
 
-
-
-print json_encode($animation_array);
-
-
-//$pos = $old_snapshot->get_pos()+($horse->speed()*$time);
+// optional print animation data to screen
+//print json_encode($animation_array);
+file_put_contents("data.js", "var data = " . json_encode($animation_array) . ";");
 
 ?>
