@@ -5,7 +5,17 @@
 		<script type="text/javascript" src="data.js"></script>
 		<script type="text/javascript" src="race.js"></script>
 	</head>
-	<body onload="draw();">
+	<body onload="start();">
+        Speed: <select id="speed" onchange="update_speed();">
+            <option value="1">Slowest</option>
+            <option value="5">Slower</option>
+            <option value="10" selected>Normal</option>
+            <option value="25">Fast</option>
+            <option value="50">Fastest</option>
+        </select>
+        Follow: <select id="follow" onchange="update_follow();"></select>
+        <button id="playpause" onclick="toggle_pause();">Pause</button>
+        <button id="rewind" onclick="rewind();">Rewind</button>
 		<canvas id="the_canvas" style="border: 1px solid black;" width="1500" height="1000"></canvas>
 		<p id="status_message">Goed</p>
 	</body>

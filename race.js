@@ -17,8 +17,53 @@ var track_radius = 420.169;
 var lane_count = 20;
 var lane_width = 4;
 
+var speed;
+var follow;
+var paused = false;
 
-function draw() {
+function update_speed() {
+    speed = parseInt(document.getElementById('speed').value);
+}
+
+function toggle_pause() {
+    if (paused) {
+        interval = window.setInterval(function() { draw2(); }, 100);
+        document.getElementById('playpause').innerHTML = "Pause";
+        paused = false;
+    } else {
+        window.clearInterval(interval);
+        document.getElementById('playpause').innerHTML = "Unpause";
+        paused = true;
+    }
+}
+
+function setup_follow() {
+    f = document.getElementById('follow');
+
+    for (var i = 0; i < data[0].length; i++) {
+        var opt = document.createElement('option');
+        opt.value = i+1;
+        opt.innerHTML = "Horse "+(i+1);
+        f.appendChild(opt);
+    }
+    
+    follow = 1;
+}
+function update_follow() {
+    follow = parseInt(document.getElementById('follow').value);
+}
+
+function rewind() {
+    ts -= (10 * speed);
+    if (ts < 0) {
+        ts = 0;
+    }
+    draw2();
+}
+
+function start() {
+    update_speed();
+    setup_follow();
 	interval = window.setInterval(function() {draw2()}, 100);
 }
 
@@ -96,7 +141,7 @@ function draw2() {
 	var horse_to_follow = horses[0];
 
 	for (i = 0; i < horses.length; i++) {
-		if (horses[i].id == 2) {
+		if (horses[i].pp == follow) {
 			horse_to_follow = horses[i];
 			break;
 		}
@@ -162,7 +207,7 @@ function draw2() {
 	ctx.fillStyle = "rgb(0, 0, 255)";
 	ctx.fillRect (x2-5, y2-5, 10, 10);*/
 
-	ts++;
+	ts += speed;
 
 	if (ts >= data.length) {
 		var status = document.getElementById('status_message');
