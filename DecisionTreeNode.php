@@ -11,7 +11,6 @@ class DecisionTreeNode {
     private $edges;
 
     function __construct($question, $edges) {
-        $this->node_id = $id;
         $this->question = $question;
         $this->edges = $edges;
     }
