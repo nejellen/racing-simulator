@@ -65,8 +65,12 @@ class trackTest extends PHPUnit_Framework_TestCase {
         $this->assertEquals($this->track->find_angle(4,1,1,1,4,0), -0.322, '', 0.001);
         $this->assertEquals($this->track->find_angle(0,3,0,0,1,3), -0.322, '', 0.001);
         $this->assertEquals($this->track->find_angle(1,3,0,0,0,3), 0.322, '', 0.001);
+        $this->assertEquals(-0.644, $this->track->find_angle(-3,-1,0,0,-3,1), '', 0.001);
+        $this->assertEquals(0.644, $this->track->find_angle(-3,1,0,0,-3,-1), '', 0.001);
+
+
         $this->assertEquals($this->track->find_angle(976.189, 1278.313, 957.160, 1272.161, 974, 1274.169), -0.194, '', 0.001);
-        $this->assertEquals($this->track->find_angle(2126.425, 409.732, 2146.424, 409.830, 2127.416, 409.831), 0.00485, '', 0.001);
+        $this->assertEquals(-0.00495,$this->track->find_angle(2126.425, 409.732, 2146.424, 409.830, 2127.416, 409.831), '', 0.001);
     }
 
     public function testGetAdjacentPoint() {

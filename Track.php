@@ -83,7 +83,9 @@ class Track {
         // this adjustment treats all angle differences greater than pi as if they
         // were actually a smaller angle in the opposite direction.
         if (abs($a - $b) > M_PI) {
-            return $a + $b;
+            $a += ($a < 0 ? M_PI : -1 * M_PI);
+            $b += ($b < 0 ? M_PI : -1 * M_PI);
+            return $a - $b;
         } else {
             return $a - $b;
         }
