@@ -26,7 +26,7 @@ class GameState {
         $this->snapshot = new snapshot(0, $track);
         foreach($horses as $horse) {
             $starting_lane = $post_positions[$i] + 3;
-            $this->snapshot->add_horse(new horse_details($horse->get_id(), $track->get_lane_start_x($starting_lane), $track->get_lane_start_y($starting_lane), $horse->get_endurance(), $horse->get_speed(), 0, 0, $post_positions[$i], 0, $starting_lane, 0, array(0,0)));
+            $this->snapshot->add_horse(new horse_details($horse->get_id(), $track->get_lane_start_x($starting_lane), $track->get_lane_start_y($starting_lane), $horse->get_endurance(), $horse->get_speed(), 0, 0, $post_positions[$i], 0, $starting_lane, 0, array(0,0), 0));
             $i++;
         }
     }

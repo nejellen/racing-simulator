@@ -8,15 +8,25 @@ require_once('DecisionTree.php');
 require_once('GameState.php');
 
 function build_compare_positions($track) {
-	return function ($a, $b) use ($track) {
-		if ($a->get_lap_counter() == $b->get_lap_counter()) {
-			return $track->lane_percent_completed($a->get_lane(), $a->get_position_x(), $a->get_position_y())
-			<
-			$track->lane_percent_completed($b->get_lane(), $b->get_position_x(), $b->get_position_y());
-		} else {
-			return $a->get_lap_counter() < $b->get_lap_counter();
-		}
-	};
+    return function ($a, $b) use ($track) {
+        if ($a->get_final_placement() == $b->get_final_placement()) {
+            if ($a->get_lap_counter() == $b->get_lap_counter()) {
+                return $track->lane_percent_completed($a->get_lane(), $a->get_position_x(), $a->get_position_y())
+                <
+                $track->lane_percent_completed($b->get_lane(), $b->get_position_x(), $b->get_position_y());
+            } else {
+                return $a->get_lap_counter() < $b->get_lap_counter();
+            }
+        } else {
+            if ($a->get_final_placement() == 0) {
+                return true;
+            } else if ($b->get_final_placement() == 0) {
+                return false;
+            } else {
+                return $a->get_final_placement() > $b->get_final_placement();
+            }
+        }
+    };
 }
 
 class snapshot {
@@ -144,7 +154,7 @@ class snapshot {
 }
 
 class horse_details {
-	function __construct($id, $position_x, $position_y, $endurance, $speed, $direction, $boost, $post_position, $section, $lane, $lap_counter, $target) {
+	function __construct($id, $position_x, $position_y, $endurance, $speed, $direction, $boost, $post_position, $section, $lane, $lap_counter, $target, $final_placement) {
 		$this->id = $id;
 		$this->position_x = $position_x;
 		$this->position_y = $position_y;
@@ -157,6 +167,7 @@ class horse_details {
 		$this->lane = $lane;
 		$this->lap_counter = $lap_counter;
 		$this->target = $target;
+        $this->final_placement = $final_placement;
 	}
 
 	function get_id() {
@@ -211,6 +222,10 @@ class horse_details {
 		return $this->target[1];
 	}
 
+    function get_final_placement() {
+		return $this->final_placement;
+	}
+
 	private $id;
 	private $position_x;
 	private $position_y;
@@ -223,6 +238,7 @@ class horse_details {
 	private $lane;
 	private $lap_counter;
     private $target;
+    private $final_placement;
 }
 
 //populate an array of horses
@@ -293,6 +309,8 @@ $done = false;
 $ts = 1;
 $ts_scale = 0.01;
 $total_distance = 840 + 1320;
+
+$final_placement = 0;
 
 while(!$done) {
 	$snapshot = new snapshot($ts, $track);
@@ -483,6 +501,13 @@ while(!$done) {
 			$new_lap = $horse_detail->get_lap_counter();
 		}
 
+        if ($new_lap == 1 && $old_section == 0 && $new_section == 1) {
+            $final_placement++;
+            $this_fp = $final_placement;
+        } else {
+            $this_fp = $horse_detail->get_final_placement();
+        }
+
 		// this is going to change!
 		$first_call_pos = 1320;
 
@@ -504,7 +529,7 @@ while(!$done) {
 		$new_end = $old_end - 0.005 * $this_ts_distance;
 
 		// create new snapshot
-		$snapshot->add_horse(new horse_details($horseid, $new_pos_x, $new_pos_y, $new_end, $new_speed, $new_direction, $new_boost, $horse_detail->get_post_position(), $new_section, $new_lane, $new_lap, $target_pt));
+		$snapshot->add_horse(new horse_details($horseid, $new_pos_x, $new_pos_y, $new_end, $new_speed, $new_direction, $new_boost, $horse_detail->get_post_position(), $new_section, $new_lane, $new_lap, $target_pt, $this_fp));
 
 		// check if horse has crossed the finish line in this ts, if so increase finished counter
 		if ($this_horse_finished) {
