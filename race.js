@@ -304,9 +304,19 @@ function draw_track(ctx, scale, x_trans, y_trans) {
 
 		ctx.fillRect(horse.tx*scale + x_trans-2, horse.ty*scale + y_trans-2, 4, 4);
 
-		ctx.fillStyle = "rgb(0,0,0)"; //red
-		ctx.font=(horse_width-1)+"px Arial";
-		ctx.fillText(horse.pp,x+0,y+(horse_width/2)-1);
+        ctx.fillRect(300+30*i,20,30,20);
 
-	}
+        if (horse.pp != 3 && horse.pp != 6 && horse.pp != 10 && horse.pp < 13) {
+            ctx.fillStyle = "rgb(0,0,0)"; // black
+        } else {
+            ctx.fillStyle = "rgb(255,255,255)"; // black
+        }
+        ctx.font=("16px Arial");
+        ctx.fillText(horse.pp,300+30*i+8,35);
+
+        if (scale >= 1) {
+            ctx.font=(horse_width-1)+"px Arial";
+            ctx.fillText(horse.pp,x+0,y+(horse_width/2)-1);
+        }
+    }
 }
