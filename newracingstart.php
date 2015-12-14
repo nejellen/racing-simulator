@@ -227,20 +227,20 @@ class horse_details {
 
 //populate an array of horses
 $horses = array(
-	new horse(1,"Alex", 60, 50, 1, 1, 1, 1),
-	new horse(2, "Bob", 60, 50, 1, 1, 1, 2),
-	new horse(3,"Maggie", 60, 50, 1, 1, 1, 3),
-	new horse(4, "Sigboom", 60, 50, 1, 1, 2, 4),
+	new horse(1,"Alex", 61, 50, 1, 1, 1, 1),
+	new horse(2, "Bob", 61, 50, 1, 1, 1, 2),
+	new horse(3,"Maggie", 61, 50, 1, 1, 1, 3),
+	new horse(4, "Sigboom", 61, 50, 1, 1, 2, 4),
 	new horse(5,"Peter", 60, 50, 1, 1, 2, 5),
 	new horse(6, "Janelle", 60, 50, 1, 1, 2, 6),
 	new horse(7,"Ingrid", 60, 50, 1, 1, 1, 7),
 	new horse(8, "Nea", 60, 50, 1, 1, 1, 1),
 	new horse(9,"Sarah", 60, 50, 1, 1, 1, 2),
 	new horse(10, "Christina", 60, 50, 1, 1, 2, 3),
-	new horse(11,"Julianna", 60, 50, 1, 1, 2, 4),
-	new horse(12, "Morgan", 60, 50, 1, 1, 2, 5),
-	new horse(13,"Amanda", 60, 50, 1, 1, 2, 6),
-	new horse(14, "Heather", 60, 50, 1, 1, 2, 7)
+	new horse(11,"Julianna", 59, 50, 1, 1, 2, 4),
+	new horse(12, "Morgan", 59, 50, 1, 1, 2, 5),
+	new horse(13,"Amanda", 59, 50, 1, 1, 2, 6),
+	new horse(14, "Heather", 59, 50, 1, 1, 2, 7)
  
 );
 
@@ -363,7 +363,8 @@ while(!$done) {
 			print "TS: $ts pos=($old_pos_x, $old_pos_y) tar=(${target_pt[0]}, ${target_pt[1]}) head=($heading_x, $heading_y) lane=(${lane_pt[0]},${lane_pt[1]}) [$old_lane] dir=$new_direction $ angle = $angle\n";
 		}*/
 		// TODO: adjust current speed
-		// check collision with horse ahead
+
+        // check collision with horse ahead and slow down if needed
 		$distance_to_my_nose = $track->distance_along_lane($old_lane, $lane_pt[0], $lane_pt[1]);
 		// adjust for number of laps around
 		$distance_to_my_nose += $track->lane_length($old_lane) * $horse_detail->get_lap_counter();
@@ -389,9 +390,18 @@ while(!$done) {
 			}
 
 			if (abs($distance_to_my_nose - $distance_to_their_nose) < 9) {
-				$new_speed = 0;//$hd->get_speed();
+				$new_speed = 0;
 			}
-		}
+        }
+
+        // Mix up speeds a bit early on to give horses a better chance to move left quickly
+        if ($horse_detail->get_lap_counter() == 0 && $distance_to_my_nose > 50 && $old_lane > 4) {
+            if ($old_lane % 2 == 0) {
+                $new_speed *= 0.9;
+            } else {
+                $new_speed *= 1.1;
+            }
+        }
 
 		//calculate distance traveled in current ts
 		$this_ts_distance = ($new_speed + rand(-20, 20)) * $dt;
@@ -457,13 +467,14 @@ while(!$done) {
 					$new_lane = $old_lane + 1;
 				}
 			}
+            // Debugging info
+            if ($ts == 10000) {
+                print "TS: $ts horse: $horseid (".$horse_detail->get_post_position().") [$old_lane -> $new_lane] left_score=".($left_lane_score === null ? "null" : $left_lane_score)." current_score=".($current_lane_score === null ? "null" : $current_lane_score)." right_score=".($right_lane_score === null ? "null" : $right_lane_score)."\n";
+            }
 		} else {
 			$new_lane = $old_lane;
 		}
 
-		//if ($horseid == 2) {
-		//print "TS: $ts horse: $horseid [$old_lane -> $new_lane] left_score=".($left_lane_score === null ? "null" : $left_lane_score)." current_score=".($current_lane_score === null ? "null" : $current_lane_score)." right_score=".($right_lane_score === null ? "null" : $right_lane_score)."\n";
-		//}
 
 		// change the lap after the horse has been around the track once.
 		if ($old_section == 5 && $new_section == 0) {
