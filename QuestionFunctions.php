@@ -41,7 +41,6 @@ function space_in_this_lane($game_state, $horse_state) {
         $distance_to_horse = $game_state->distance_along_lane($details->get_lane(), $horse_details->get_position_x(), $horse_details->get_position_y());
         // adjust for number of laps around
         $distance_to_horse += $game_state->lane_length($details->get_lane()) * $horse_details->get_lap_counter();
-        //print "horse:{$horse_state->horseid} tarlane:{$horse_state->lane} dist:$distance_to_horse distpoint:$distance_to_adj_pt [{$details->get_lane()},{$details->get_position_x()},{$details->get_position_y()}]\n";
         if (abs($distance_to_adj_pt - $distance_to_horse) < 9) {
             return "no";
         }
@@ -97,7 +96,7 @@ function num_lengths_ahead($game_state, $horse_state) {
     }
 
     $relative_distance = $nearest_distance - $distance_to_adj_pt;
-    if ($relative_distance === null) {
+    if ($nearest_distance === null) {
         return "5+";
     } else if ($relative_distance < 9) {
         return "0";
@@ -160,3 +159,4 @@ function yes($game_state, $lane) {
 function no($game_state, $lane) {
     return "no";
 }
+
