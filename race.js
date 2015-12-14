@@ -318,5 +318,8 @@ function draw_track(ctx, scale, x_trans, y_trans) {
             ctx.font=(horse_width-1)+"px Arial";
             ctx.fillText(horse.pp,x+0,y+(horse_width/2)-1);
         }
+
+        ctx.fillStyle = "rgb(0,0,0)";
+        ctx.fillRect(2159*scale+x_trans,1260*scale+y_trans,2*scale,20*lane_width*scale);
     }
 }
