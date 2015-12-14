@@ -463,7 +463,7 @@ while(!$done) {
 
 			if ($right_lane_score !== null && $left_lane_score !== null) {
 				// switch lanes or stay in current lane based on score
-				if ($current_lane_score > $right_lane_score && $current_lane_score > $left_lane_score) {
+				if ($current_lane_score >= $right_lane_score && $current_lane_score >= $left_lane_score) {
 					$new_lane = $old_lane;
 				} else if ($right_lane_score > $current_lane_score && $right_lane_score > $left_lane_score) {
 					$new_lane = $old_lane + 1;
@@ -473,13 +473,13 @@ while(!$done) {
 			} else if ($right_lane_score === null && $left_lane_score === null) {
 				$new_lane = $old_lane;
 			} else if ($right_lane_score === null) {
-				if ($current_lane_score > $left_lane_score) {
+				if ($current_lane_score >= $left_lane_score) {
 					$new_lane = $old_lane;
 				} else {
 					$new_lane = $old_lane - 1;
 				}
 			} else if ($left_lane_score === null) {
-				if ($current_lane_score > $right_lane_score) {
+				if ($current_lane_score >= $right_lane_score) {
 					$new_lane = $old_lane;
 				} else if ($right_lane_score > $current_lane_score) {
 					$new_lane = $old_lane + 1;
