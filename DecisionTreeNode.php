@@ -5,6 +5,13 @@ require_once("QuestionFunctions.php");
 
 /**
  * Class DecisionTreeNode represents a node in a Decision Tree data structure
+ * The DecisionTreeNode class stores a question as a string.
+ * It has an “ask_question” function that calls the function for the question
+ * (from QuestionFunctions) stored as a string in the node
+ * and searches its array of edges for an edge with a matching answer.
+ *
+ * The edge class has a boolean compare function that returns true if the answers match.
+ * It also stores the next node or question to ask.
  */
 class DecisionTreeNode {
     private $question;
